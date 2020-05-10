@@ -1,0 +1,99 @@
+/************************Test*************************************/
+#include "includes.h"
+OS_STK   StartTaskStk[TASK_STK_SIZE];			//定义任务堆栈区
+OS_STK   MyTaskStk[TASK_STK_SIZE];			//定义任务堆栈区
+OS_STK   YouTaskStk[TASK_STK_SIZE];			//定义任务堆栈区
+OS_STK   HerTaskStk[TASK_STK_SIZE];			//定义任务堆栈区
+INT16S   key;						//用于退出的键
+char*s1 = "MyTask正在运行";
+char*s2 = "YouTask正在运行";
+char*s3 = "HerTask正在运行";
+INT8U err;
+INT8U y = 0;						//字符显示位置					
+OS_FLAG_GRP *Sem_F;
+void  StartTask(void *data);				//声明起始任务
+void  MyTask(void *data);				//声明任务
+void  YouTask(void *data);				//声明任务
+void  HerTask(void *data);				//声明任务
+/************************主函数*********************************/
+void  TaskCreate(void)
+{
+	Sem_F = OSFlagCreate(0, &err);			//创建信号量集
+	OSTaskCreate(StartTask,				//创建任务StartTask
+		(void*)0,					//给任务传递参数
+		&StartTaskStk[TASK_STK_SIZE - 1],		//设置任务堆栈栈顶
+		0);						//使任务的优先级别为0
+	OSStart();						//启动多任务管理
+}
+/***********************任务StartTask*******************************/
+void  StartTask(void *pdata)
+{
+#if OS_CRITICAL_METHOD == 3
+	OS_CPU_SR  cpu_sr;
+#endif
+	pdata = pdata;
+	OSTaskCreate(MyTask,			//创建任务MyTask
+		(void*)0,			//给任务传递参数
+		&MyTaskStk[TASK_STK_SIZE - 1],	//设置任务堆栈栈顶
+		3);				//使任务的优先级别为3
+	OSTaskCreate(YouTask,			//创建任务YouTask
+		(void*)0,			//给任务传递参数
+		&YouTaskStk[TASK_STK_SIZE - 1],	//设置任务堆栈栈顶
+		4);				//使任务的优先级别为4
+	OSTaskCreate(HerTask,			//创建任务HerTask
+		(void*)0,			//给任务传递参数
+		&HerTaskStk[TASK_STK_SIZE - 1],	//设置任务堆栈栈顶
+		5);				//使任务的优先级别为5
+
+}
+/************************任务MyTask*******************************/
+void  MyTask(void *pdata)
+{
+	pdata = pdata;
+	for (;;)
+	{
+		OSFlagPend(			//请求信号量集
+			Sem_F,
+			(OS_FLAGS)3,		//请求第0位和第1位信号
+			OS_FLAG_WAIT_SET_ALL,	//第0位和第1位信号都为1为有效
+			0,&err
+		);
+		printf("%s\n", s1);
+		OSTimeDlyHMSM(0, 0, 2, 0);		//等待2秒
+	}
+}
+/************************任务YouTask******************************/
+void  YouTask(void *pdata)
+{
+	pdata = pdata;
+	for (;;)
+	{
+		printf("%s\n", s2);
+		OSTimeDlyHMSM(0, 0, 8, 0);		//延时8秒
+		OSFlagPost(				//发送信号量集
+			Sem_F,
+			(OS_FLAGS)2,			//给第1位发信号
+			OS_FLAG_SET,			//信号置1
+			&err
+		);
+		OSTimeDlyHMSM(0, 0, 2, 0);		//等待2秒
+	}
+}
+/************************任务HerTask******************************/
+void  HerTask(void *pdata)
+{
+	pdata = pdata;
+
+	for (;;)
+	{
+		printf("%s\n", s3);
+		OSFlagPost(				//发送信号量集
+			Sem_F,
+			(OS_FLAGS)1,			//给第0位发信号
+			OS_FLAG_SET,			//信号置1
+			&err
+		);
+		OSTimeDlyHMSM(0, 0, 1, 0);	//等待1秒
+	}
+}
+/************************End**************************************/
